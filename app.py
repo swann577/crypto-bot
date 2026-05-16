@@ -1,148 +1,212 @@
-from flask import Flask, jsonify
+from flask import Flask, render_template_string
 import random
+import requests
+import json
+import os
+import time
 
 app = Flask(__name__)
 
+SAVE_FILE = "bot_data.json"
+
 bot = {
-    "active": False,
-    "capital_base": 100.0,   # capital initial
-    "capital_used": 100.0,   # toujours réinvesti
-    "profit_wallet": 0.0,    # profits stockés
-    "price": 60000,
-    "trades": []
+    "active": True,
+    "capital": 100.0,
+    "profit_wallet": 0.0,
+    "btc_price": 0,
+    "trades": [],
+    "last_trade_time": 0
 }
 
-def market_move():
-    bot["price"] += random.uniform(-250, 250)
+# =========================
+# SAUVEGARDE
+# =========================
 
-def signal():
-    rsi = random.randint(10, 90)
-    return rsi
+def save_data():
+    with open(SAVE_FILE, "w") as f:
+        json.dump(bot, f)
+
+def load_data():
+    global bot
+    if os.path.exists(SAVE_FILE):
+        with open(SAVE_FILE, "r") as f:
+            bot = json.load(f)
+
+load_data()
+
+# =========================
+# PRIX BTC BINANCE
+# =========================
+
+def get_btc_price():
+    try:
+        url = "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
+        data = requests.get(url).json()
+        return round(float(data["price"]), 2)
+    except:
+        return random.randint(60000, 70000)
+
+# =========================
+# BOT TRADING
+# =========================
 
 def trade_logic():
-    if not bot["active"]:
+
+    now = time.time()
+
+    # 1 trade max toutes les 30 sec
+    if now - bot["last_trade_time"] < 30:
         return
 
-    market_move()
-    rsi = signal()
+    bot["last_trade_time"] = now
+
+    bot["btc_price"] = get_btc_price()
+
+    rsi = random.randint(20, 80)
 
     action = "HOLD"
     profit = 0
 
-    # stratégie simple intelligente simulée
-    if rsi < 30:
-        profit = random.uniform(0.5, 3.0)
-        bot["capital_used"] = bot["capital_base"]  # réinvesti
-        bot["profit_wallet"] += profit
+    if rsi < 35:
         action = "BUY"
+        profit = round(random.uniform(0.5, 2.5), 2)
 
-    elif rsi > 70:
-        profit = -random.uniform(0.5, 2.0)
-        bot["profit_wallet"] += profit
+    elif rsi > 65:
         action = "SELL"
+        profit = round(random.uniform(-1.5, 1.5), 2)
 
-    bot["trades"].append({
-        "price": round(bot["price"], 2),
-        "rsi": rsi,
-        "action": action,
-        "profit_wallet": round(bot["profit_wallet"], 2)
-    })
+    if action != "HOLD":
+
+        if profit > 0:
+            bot["profit_wallet"] += profit
+        else:
+            bot["capital"] += profit
+
+        trade = {
+            "action": action,
+            "profit": profit,
+            "btc_price": bot["btc_price"],
+            "rsi": rsi
+        }
+
+        bot["trades"].insert(0, trade)
+
+        # max 50 trades affichés
+        bot["trades"] = bot["trades"][:50]
+
+        save_data()
+
+# =========================
+# PAGE WEB
+# =========================
 
 @app.route("/")
 def home():
-    trade_logic()
 
-    status = "🟢 ACTIF" if bot["active"] else "🔴 STOP"
+    if bot["active"]:
+        trade_logic()
 
-    return f"""
+    html = """
     <html>
     <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Crypto Bot iPhone PRO</title>
+        <title>Crypto Bot Pro</title>
+
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
         <style>
-            body {{
-                margin:0;
-                font-family:-apple-system;
-                background:#0b1220;
+
+            body{
+                background:#0f172a;
                 color:white;
-                text-align:center;
-            }}
-
-            .card {{
-                background:#111a2e;
-                margin:20px;
+                font-family:Arial;
                 padding:20px;
-                border-radius:20px;
-            }}
+            }
 
-            .title {{
-                font-size:22px;
-                font-weight:bold;
-                color:#facc15;
-            }}
+            .card{
+                background:#1e293b;
+                padding:20px;
+                border-radius:15px;
+                margin-bottom:20px;
+            }
 
-            .price {{
-                font-size:28px;
-                color:#22c55e;
-            }}
-
-            .profit {{
-                font-size:22px;
+            h1{
                 color:#38bdf8;
-            }}
+            }
 
-            button {{
+            .profit{
+                color:#22c55e;
+                font-size:22px;
+            }
+
+            .loss{
+                color:#ef4444;
+            }
+
+            button{
+                width:100%;
                 padding:15px;
-                width:90%;
                 border:none;
-                border-radius:12px;
-                background:#3b82f6;
+                border-radius:10px;
+                background:#38bdf8;
                 color:white;
                 font-size:18px;
-            }}
+            }
+
         </style>
     </head>
 
     <body>
 
+        <h1>🤖 Crypto Bot Pro</h1>
+
         <div class="card">
-            <div class="title">🤖 Crypto Bot iPhone PRO</div>
-            <p>Statut : {status}</p>
-        </div>
-
-        <div class="card price">
-            BTC : {round(bot["price"],2)} $
-        </div>
-
-        <div class="card profit">
-            💰 Profit wallet : {round(bot["profit_wallet"],2)} €
+            <h2>📊 Capital</h2>
+            <p>{{capital}} €</p>
         </div>
 
         <div class="card">
-            📊 Capital réinvesti : {bot["capital_base"]} €
+            <h2>💰 Profit Wallet</h2>
+            <p class="profit">{{profit}} €</p>
         </div>
 
-        <a href="/toggle">
-            <button>ON / OFF BOT</button>
-        </a>
+        <div class="card">
+            <h2>₿ BTC Price</h2>
+            <p>{{btc}} $</p>
+        </div>
 
         <div class="card">
-            📈 Trades : {len(bot["trades"])}
+            <h2>📈 Trades</h2>
+
+            {% for trade in trades %}
+
+                <p>
+                    {{trade.action}}
+                    |
+                    RSI {{trade.rsi}}
+                    |
+                    BTC {{trade.btc_price}} $
+                    |
+                    <span class="{% if trade.profit >=0 %}profit{% else %}loss{% endif %}">
+                        {{trade.profit}} €
+                    </span>
+                </p>
+
+            {% endfor %}
         </div>
 
     </body>
     </html>
     """
 
-@app.route("/toggle")
-def toggle():
-    bot["active"] = not bot["active"]
-    return "<script>window.location.href='/'</script>"
+    return render_template_string(
+        html,
+        capital=round(bot["capital"],2),
+        profit=round(bot["profit_wallet"],2),
+        btc=bot["btc_price"],
+        trades=bot["trades"]
+    )
 
-@app.route("/data")
-def data():
-    return jsonify(bot)
+# =========================
 
 if __name__ == "__main__":
-    import os
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
