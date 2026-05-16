@@ -1,38 +1,52 @@
 from flask import Flask, jsonify
 import random
-import time
 
 app = Flask(__name__)
 
-# État global du bot (simulation)
 bot = {
     "active": False,
-    "capital": 1000,
-    "profit": 0,
-    "price": 65000
+    "capital_base": 100.0,   # capital initial
+    "capital_used": 100.0,   # toujours réinvesti
+    "profit_wallet": 0.0,    # profits stockés
+    "price": 60000,
+    "trades": []
 }
 
-# Simule le marché
-def update_price():
-    change = random.uniform(-500, 500)
-    bot["price"] = max(1000, bot["price"] + change)
+def market_move():
+    bot["price"] += random.uniform(-250, 250)
 
-# Simule trading
+def signal():
+    rsi = random.randint(10, 90)
+    return rsi
+
 def trade_logic():
     if not bot["active"]:
         return
 
-    update_price()
+    market_move()
+    rsi = signal()
 
-    rsi = random.randint(10, 90)
+    action = "HOLD"
+    profit = 0
 
-    # stratégie simple
+    # stratégie simple intelligente simulée
     if rsi < 30:
-        gain = random.uniform(1, 10)
-        bot["profit"] += gain
+        profit = random.uniform(0.5, 3.0)
+        bot["capital_used"] = bot["capital_base"]  # réinvesti
+        bot["profit_wallet"] += profit
+        action = "BUY"
+
     elif rsi > 70:
-        loss = random.uniform(1, 8)
-        bot["profit"] -= loss
+        profit = -random.uniform(0.5, 2.0)
+        bot["profit_wallet"] += profit
+        action = "SELL"
+
+    bot["trades"].append({
+        "price": round(bot["price"], 2),
+        "rsi": rsi,
+        "action": action,
+        "profit_wallet": round(bot["profit_wallet"], 2)
+    })
 
 @app.route("/")
 def home():
@@ -43,34 +57,28 @@ def home():
     return f"""
     <html>
     <head>
-        <title>Crypto Bot PRO</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Crypto Bot iPhone PRO</title>
         <style>
             body {{
                 margin:0;
-                font-family:Arial;
+                font-family:-apple-system;
                 background:#0b1220;
                 color:white;
-            }}
-
-            .container {{
-                max-width:500px;
-                margin:50px auto;
-                padding:20px;
-                background:#111a2e;
-                border-radius:20px;
                 text-align:center;
-                box-shadow:0 0 20px rgba(0,0,0,0.5);
             }}
 
-            h1 {{
+            .card {{
+                background:#111a2e;
+                margin:20px;
+                padding:20px;
+                border-radius:20px;
+            }}
+
+            .title {{
+                font-size:22px;
+                font-weight:bold;
                 color:#facc15;
-            }}
-
-            .box {{
-                background:#1f2a44;
-                padding:15px;
-                margin:10px 0;
-                border-radius:12px;
             }}
 
             .price {{
@@ -78,47 +86,50 @@ def home():
                 color:#22c55e;
             }}
 
-            button {{
-                padding:15px 25px;
-                border:none;
-                border-radius:10px;
-                font-size:16px;
-                cursor:pointer;
-                background:#3b82f6;
-                color:white;
-                margin-top:10px;
+            .profit {{
+                font-size:22px;
+                color:#38bdf8;
             }}
 
-            button:hover {{
-                background:#2563eb;
+            button {{
+                padding:15px;
+                width:90%;
+                border:none;
+                border-radius:12px;
+                background:#3b82f6;
+                color:white;
+                font-size:18px;
             }}
         </style>
     </head>
 
     <body>
-        <div class="container">
-            <h1>🤖 Crypto Bot IA PRO</h1>
 
-            <div class="box">
-                Statut : {status}
-            </div>
-
-            <div class="box price">
-                BTC : {round(bot["price"], 2)} $
-            </div>
-
-            <div class="box">
-                💰 Profit : {round(bot["profit"], 2)} $
-            </div>
-
-            <a href="/toggle">
-                <button>ON / OFF BOT</button>
-            </a>
-
-            <p style="margin-top:20px;font-size:12px;color:gray;">
-                Simulation trading - Render Cloud
-            </p>
+        <div class="card">
+            <div class="title">🤖 Crypto Bot iPhone PRO</div>
+            <p>Statut : {status}</p>
         </div>
+
+        <div class="card price">
+            BTC : {round(bot["price"],2)} $
+        </div>
+
+        <div class="card profit">
+            💰 Profit wallet : {round(bot["profit_wallet"],2)} €
+        </div>
+
+        <div class="card">
+            📊 Capital réinvesti : {bot["capital_base"]} €
+        </div>
+
+        <a href="/toggle">
+            <button>ON / OFF BOT</button>
+        </a>
+
+        <div class="card">
+            📈 Trades : {len(bot["trades"])}
+        </div>
+
     </body>
     </html>
     """
