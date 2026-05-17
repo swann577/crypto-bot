@@ -146,6 +146,11 @@ def trade_logic():
             bot["profit_wallet"] += profit
         else:
             bot["capital"] += profit
+                    save_bot_data(
+            bot["capital"],
+            bot["profit_wallet"],
+            len(bot["trades"])
+        )
 
         trade = {
             "action": action,
