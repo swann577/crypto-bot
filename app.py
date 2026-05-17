@@ -10,6 +10,34 @@ app = Flask(__name__)
 # DATABASE
 
 def init_db():
+    def get_bot_data():
+    conn = sqlite3.connect('bot.db')
+    c = conn.cursor()
+
+    c.execute('SELECT capital, profit_wallet, trades FROM bot WHERE id = 1')
+    data = c.fetchone()
+
+    conn.close()
+
+    return {
+        "capital": data[0],
+        "profit_wallet": data[1],
+        "trades_count": data[2]
+    }
+
+
+def save_bot_data(capital, profit_wallet, trades_count):
+    conn = sqlite3.connect('bot.db')
+    c = conn.cursor()
+
+    c.execute('''
+        UPDATE bot
+        SET capital=?, profit_wallet=?, trades=?
+        WHERE id=1
+    ''', (capital, profit_wallet, trades_count))
+
+    conn.commit()
+    conn.close()
     conn = sqlite3.connect('bot.db')
     c = conn.cursor()
 
