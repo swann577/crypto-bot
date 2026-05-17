@@ -81,7 +81,7 @@ bot = {
     "btc_price": 0,
     "last_trade_time": 0
 }
-}
+
 
 # =========================
 # SAUVEGARDE
