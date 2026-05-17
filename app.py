@@ -1,3 +1,4 @@
+```python
 from flask import Flask, render_template_string
 import random
 import sqlite3
@@ -7,38 +8,17 @@ import os
 import time
 
 app = Flask(__name__)
+
+# =========================
 # DATABASE
+# =========================
+
+DB_FILE = "bot.db"
+SAVE_FILE = "bot_data.json"
+
 
 def init_db():
-    def get_bot_data():
-    conn = sqlite3.connect('bot.db')
-    c = conn.cursor()
-
-    c.execute('SELECT capital, profit_wallet, trades FROM bot WHERE id = 1')
-    data = c.fetchone()
-
-    conn.close()
-
-    return {
-        "capital": data[0],
-        "profit_wallet": data[1],
-        "trades_count": data[2]
-    }
-
-
-def save_bot_data(capital, profit_wallet, trades_count):
-    conn = sqlite3.connect('bot.db')
-    c = conn.cursor()
-
-    c.execute('''
-        UPDATE bot
-        SET capital=?, profit_wallet=?, trades=?
-        WHERE id=1
-    ''', (capital, profit_wallet, trades_count))
-
-    conn.commit()
-    conn.close()
-    conn = sqlite3.connect('bot.db')
+    conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
 
     c.execute('''
@@ -47,17 +27,6 @@ def save_bot_data(capital, profit_wallet, trades_count):
             capital REAL,
             profit_wallet REAL,
             trades INTEGER
-        )
-    ''')
-
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS trades (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            side TEXT,
-            amount REAL,
-            profit REAL,
-            rsi INTEGER,
-            btc_price REAL
         )
     ''')
 
@@ -72,36 +41,88 @@ def save_bot_data(capital, profit_wallet, trades_count):
     conn.commit()
     conn.close()
 
+
 init_db()
 
-SAVE_FILE = "bot_data.json"
+
+# =========================
+# SQLITE FUNCTIONS
+# =========================
+
+
+def get_bot_data():
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+
+    c.execute('SELECT capital, profit_wallet, trades FROM bot WHERE id = 1')
+    data = c.fetchone()
+
+    conn.close()
+
+    return {
+        "capital": data[0],
+        "profit_wallet": data[1],
+        "trades_count": data[2]
+    }
+
+
+
+def save_bot_data(capital, profit_wallet, trades_count):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+
+    c.execute('''
+        UPDATE bot
+        SET capital=?, profit_wallet=?, trades=?
+        WHERE id=1
+    ''', (capital, profit_wallet, trades_count))
+
+    conn.commit()
+    conn.close()
+
+
+# =========================
+# BOT
+# =========================
 
 bot = {
     "active": True,
     "btc_price": 0,
-    "last_trade_time": 0
+    "last_trade_time": 0,
+    "trades": []
 }
 
 
 # =========================
-# SAUVEGARDE
+# SAVE JSON
 # =========================
+
 
 def save_data():
     with open(SAVE_FILE, "w") as f:
         json.dump(bot, f)
 
+
+
 def load_data():
     global bot
+
     if os.path.exists(SAVE_FILE):
         with open(SAVE_FILE, "r") as f:
-            bot = json.load(f)
+            loaded = json.load(f)
+
+            bot["trades"] = loaded.get("trades", [])
+            bot["btc_price"] = loaded.get("btc_price", 0)
+            bot["last_trade_time"] = loaded.get("last_trade_time", 0)
+
 
 load_data()
 
+
 # =========================
-# PRIX BTC BINANCE
+# BTC PRICE
 # =========================
+
 
 def get_btc_price():
     try:
@@ -111,12 +132,13 @@ def get_btc_price():
     except:
         return random.randint(60000, 70000)
 
+
 # =========================
-# BOT TRADING
+# TRADING LOGIC
 # =========================
+
 
 def trade_logic():
-
     now = time.time()
 
     # 1 trade max toutes les 30 sec
@@ -124,6 +146,11 @@ def trade_logic():
         return
 
     bot["last_trade_time"] = now
+
+    data = get_bot_data()
+
+    capital = data["capital"]
+    profit_wallet = data["profit_wallet"]
 
     bot["btc_price"] = get_btc_price()
 
@@ -143,18 +170,15 @@ def trade_logic():
     if action != "HOLD":
 
         if profit > 0:
-    bot["profit_wallet"] += profit
-else:
-    bot["capital"] += profit
+            profit_wallet += profit
+        else:
+            capital += profit
 
-save_bot_data(
-    bot["capital"],
-    bot["profit_wallet"],
-    len(bot["trades"])
-)
-            
-
-    
+        save_bot_data(
+            capital,
+            profit_wallet,
+            len(bot["trades"])
+        )
 
         trade = {
             "action": action,
@@ -165,24 +189,27 @@ save_bot_data(
 
         bot["trades"].insert(0, trade)
 
-        # max 50 trades affichés
+        # max 50 trades
         bot["trades"] = bot["trades"][:50]
 
         save_data()
+
 
 # =========================
 # PAGE WEB
 # =========================
 
+
 @app.route("/")
 def home():
+
+    if bot["active"]:
+        trade_logic()
+
     data = get_bot_data()
 
     capital = data["capital"]
     profit_wallet = data["profit_wallet"]
-
-    if bot["active"]:
-        trade_logic()
 
     html = """
     <html>
@@ -218,16 +245,6 @@ def home():
 
             .loss{
                 color:#ef4444;
-            }
-
-            button{
-                width:100%;
-                padding:15px;
-                border:none;
-                border-radius:10px;
-                background:#38bdf8;
-                color:white;
-                font-size:18px;
             }
 
         </style>
@@ -270,24 +287,24 @@ def home():
                 </p>
 
             {% endfor %}
+
         </div>
 
     </body>
     </html>
     """
-    data = get_bot_data()
 
-    capital = data["capital"]
-    profit_wallet = data["profit_wallet"]
     return render_template_string(
         html,
-        capital=round(capital,2),
-        profit=round(profit_wallet,2),
+        capital=round(capital, 2),
+        profit=round(profit_wallet, 2),
         btc=bot["btc_price"],
         trades=bot["trades"]
     )
+
 
 # =========================
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+```
