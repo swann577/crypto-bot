@@ -266,11 +266,14 @@ def home():
     </body>
     </html>
     """
+    data = get_bot_data()
 
+    capital = data["capital"]
+    profit_wallet = data["profit_wallet"]
     return render_template_string(
         html,
-        capital=round(bot["capital"],2),
-        profit=round(bot["profit_wallet"],2),
+        capital=round(capital,2),
+        profit=round(profit_wallet,2),
         btc=bot["btc_price"],
         trades=bot["trades"]
     )
