@@ -143,14 +143,18 @@ def trade_logic():
     if action != "HOLD":
 
         if profit > 0:
-            bot["profit_wallet"] += profit
-        else:
-            bot["capital"] += profit
-                    save_bot_data(
-            bot["capital"],
-            bot["profit_wallet"],
-            len(bot["trades"])
-        )
+    bot["profit_wallet"] += profit
+else:
+    bot["capital"] += profit
+
+save_bot_data(
+    bot["capital"],
+    bot["profit_wallet"],
+    len(bot["trades"])
+)
+            
+
+    
 
         trade = {
             "action": action,
@@ -172,7 +176,7 @@ def trade_logic():
 
 @app.route("/")
 def home():
-        data = get_bot_data()
+    data = get_bot_data()
 
     capital = data["capital"]
     profit_wallet = data["profit_wallet"]
