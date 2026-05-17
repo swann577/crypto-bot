@@ -50,11 +50,9 @@ SAVE_FILE = "bot_data.json"
 
 bot = {
     "active": True,
-    "capital": 100.0,
-    "profit_wallet": 0.0,
     "btc_price": 0,
-    "trades": [],
     "last_trade_time": 0
+}
 }
 
 # =========================
