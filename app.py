@@ -1,11 +1,50 @@
 from flask import Flask, render_template_string
 import random
+import sqlite3
 import requests
 import json
 import os
 import time
 
 app = Flask(__name__)
+# DATABASE
+
+def init_db():
+    conn = sqlite3.connect('bot.db')
+    c = conn.cursor()
+
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS bot (
+            id INTEGER PRIMARY KEY,
+            capital REAL,
+            profit_wallet REAL,
+            trades INTEGER
+        )
+    ''')
+
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS trades (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            side TEXT,
+            amount REAL,
+            profit REAL,
+            rsi INTEGER,
+            btc_price REAL
+        )
+    ''')
+
+    c.execute('SELECT * FROM bot WHERE id = 1')
+    existing = c.fetchone()
+
+    if not existing:
+        c.execute(
+            'INSERT INTO bot (id, capital, profit_wallet, trades) VALUES (1, 100, 0, 0)'
+        )
+
+    conn.commit()
+    conn.close()
+
+init_db()
 
 SAVE_FILE = "bot_data.json"
 
