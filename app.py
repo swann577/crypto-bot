@@ -167,6 +167,10 @@ def trade_logic():
 
 @app.route("/")
 def home():
+        data = get_bot_data()
+
+    capital = data["capital"]
+    profit_wallet = data["profit_wallet"]
 
     if bot["active"]:
         trade_logic()
